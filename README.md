@@ -57,7 +57,3 @@ sgks_football/
 - The backend uses SQLite for easy local development.
 - CORS is enabled for local frontend-backend communication.
 - All player and match data is editable and deletable from the UI.
-
----
-
-**Developed for SGKS by [your name/team].**

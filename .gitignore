@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.venv
+venv/
+env/
+ENV/
+
+# Conda
+env*/
+*.conda
+*.env
+*.ipynb_checkpoints
+
+# SQLite
+db.sqlite3
+*.db
+*.sqlite3
+
+# FastAPI/Backend
+backend/football.db
+backend/test_football.db
+backend/.mypy_cache/
+backend/.pytest_cache/
+backend/.env
+backend/.DS_Store
+
+# Node/React/Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.DS_Store
+
+# Vite
+frontend/.vite
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Misc
+*.orig 

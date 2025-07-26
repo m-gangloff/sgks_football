@@ -1,199 +1,291 @@
-import React, { useState, useEffect } from "react";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
-import Button from "@mui/material/Button";
-import TextField from "@mui/material/TextField";
-import MenuItem from "@mui/material/MenuItem";
-import IconButton from "@mui/material/IconButton";
-import AddIcon from "@mui/icons-material/Add";
-import RemoveIcon from "@mui/icons-material/Remove";
-import { getPlayers } from "../api";
+import React, { useState, useEffect } from 'react';
+import {
+  TextField,
+  Button,
+  Box,
+  Typography,
+  MenuItem,
+  IconButton,
+  Alert,
+  Grid,
+  Paper
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
+import { createMatch, getPlayers } from '../api';
 
-function GoalInput({ players, value, onChange, team }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-      <TextField
-        select
-        label="Player"
-        value={value.player_id}
-        onChange={e => onChange({ ...value, player_id: e.target.value })}
-        style={{ minWidth: 160 }}
-        size="small"
-        required
-      >
-        {players.map(p => (
-          <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-        ))}
-      </TextField>
-      <TextField
-        label="Goals"
-        type="number"
-        value={value.goals}
-        onChange={e => onChange({ ...value, goals: Math.max(0, Number(e.target.value)) })}
-        size="small"
-        inputProps={{ min: 0 }}
-        style={{ width: 80 }}
-        required
-      />
-      <TextField
-        label="Own Goals"
-        type="number"
-        value={value.own_goals}
-        onChange={e => onChange({ ...value, own_goals: Math.max(0, Number(e.target.value)) })}
-        size="small"
-        inputProps={{ min: 0 }}
-        style={{ width: 100 }}
-      />
-    </div>
-  );
-}
-
-export default function MatchForm({ open, onClose, onMatchAdded }) {
-  const [date, setDate] = useState("");
-  const [loading, setLoading] = useState(false);
+const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
+  const [date, setDate] = useState('');
   const [players, setPlayers] = useState([]);
-  const [youngGoals, setYoungGoals] = useState([]);
-  const [oldGoals, setOldGoals] = useState([]);
+  const [goalscorers, setGoalscorers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    getPlayers().then(ps => {
-      setPlayers(ps.sort((a, b) => a.name.localeCompare(b.name)));
+    fetchPlayers();
+  }, [globalPassword]);
+
+  const fetchPlayers = async () => {
+    try {
+      const response = await getPlayers(globalPassword);
+      if (response.ok) {
+        const data = await response.json();
+        setPlayers(data.sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    } catch (error) {
+      console.error('Failed to fetch players:', error);
+    }
+  };
+
+  const addGoalscorer = () => {
+    setGoalscorers([
+      ...goalscorers,
+      { player_id: '', team: 'young', goals: 0, own_goals: 0 }
+    ]);
+  };
+
+  const removeGoalscorer = (index) => {
+    setGoalscorers(goalscorers.filter((_, i) => i !== index));
+  };
+
+  const updateGoalscorer = (index, field, value) => {
+    const updated = [...goalscorers];
+    updated[index] = { ...updated[index], [field]: value };
+    setGoalscorers(updated);
+  };
+
+  const calculateScores = () => {
+    let teamYoungScore = 0;
+    let teamOldScore = 0;
+
+    goalscorers.forEach(scorer => {
+      if (scorer.player_id && (scorer.goals > 0 || scorer.own_goals > 0)) {
+        if (scorer.team === 'young') {
+          teamYoungScore += scorer.goals;
+          teamOldScore += scorer.own_goals; // Own goals count for the other team
+        } else {
+          teamOldScore += scorer.goals;
+          teamYoungScore += scorer.own_goals; // Own goals count for the other team
+        }
+      }
     });
-  }, []);
 
-  const handleAddGoal = (team) => {
-    const newGoal = { player_id: players[0]?.id || "", goals: 0, own_goals: 0 };
-    if (team === "young") setYoungGoals([...youngGoals, newGoal]);
-    else setOldGoals([...oldGoals, newGoal]);
+    return { teamYoungScore, teamOldScore };
   };
 
-  const handleRemoveGoal = (team, idx) => {
-    if (team === "young") setYoungGoals(youngGoals.filter((_, i) => i !== idx));
-    else setOldGoals(oldGoals.filter((_, i) => i !== idx));
+  const canSubmit = () => {
+    if (!date) return false;
+    return goalscorers.some(scorer => 
+      scorer.player_id && (scorer.goals > 0 || scorer.own_goals > 0)
+    );
   };
-
-  const handleGoalChange = (team, idx, value) => {
-    if (team === "young") setYoungGoals(youngGoals.map((g, i) => i === idx ? value : g));
-    else setOldGoals(oldGoals.map((g, i) => i === idx ? value : g));
-  };
-
-  // Compute scores from goalscorers
-  const teamYoungScore =
-    youngGoals.reduce((sum, g) => sum + Number(g.goals), 0) +
-    oldGoals.reduce((sum, g) => sum + Number(g.own_goals), 0);
-  const teamOldScore =
-    oldGoals.reduce((sum, g) => sum + Number(g.goals), 0) +
-    youngGoals.reduce((sum, g) => sum + Number(g.own_goals), 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canSubmit()) {
+      setError('Please fill in the date and add at least one goal');
+      return;
+    }
+
     setLoading(true);
-    // Flatten goals for API
-    const goals = [
-      ...youngGoals.flatMap(g => [
-        ...Array(g.goals).fill({ player_id: g.player_id, is_own_goal: false, team: "young" }),
-        ...Array(g.own_goals).fill({ player_id: g.player_id, is_own_goal: true, team: "young" })
-      ]),
-      ...oldGoals.flatMap(g => [
-        ...Array(g.goals).fill({ player_id: g.player_id, is_own_goal: false, team: "old" }),
-        ...Array(g.own_goals).fill({ player_id: g.player_id, is_own_goal: true, team: "old" })
-      ])
-    ];
-    const match = {
-      date,
-      team_young_score: teamYoungScore,
-      team_old_score: teamOldScore,
-      goals,
-    };
-    if (onMatchAdded) await onMatchAdded(match);
-    setLoading(false);
-    setDate("");
-    setYoungGoals([]);
-    setOldGoals([]);
-    onClose();
+    setError('');
+    setSuccess('');
+
+    const { teamYoungScore, teamOldScore } = calculateScores();
+
+    // Convert goalscorers to the format expected by the API
+    const goals = goalscorers
+      .filter(scorer => scorer.player_id && (scorer.goals > 0 || scorer.own_goals > 0))
+      .flatMap(scorer => {
+        const goals = [];
+        // Add regular goals
+        for (let i = 0; i < scorer.goals; i++) {
+          goals.push({
+            player_id: parseInt(scorer.player_id),
+            team: scorer.team,
+            is_own_goal: false
+          });
+        }
+        // Add own goals
+        for (let i = 0; i < scorer.own_goals; i++) {
+          goals.push({
+            player_id: parseInt(scorer.player_id),
+            team: scorer.team,
+            is_own_goal: true
+          });
+        }
+        return goals;
+      });
+
+    try {
+      const response = await createMatch({
+        date,
+        team_young_score: teamYoungScore,
+        team_old_score: teamOldScore,
+        goals
+      }, globalPassword);
+
+      if (response.ok) {
+        setSuccess('Match added successfully!');
+        setDate('');
+        setGoalscorers([]);
+        // Trigger refresh of match list
+        window.location.reload();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.detail || 'Failed to add match');
+      }
+    } catch (error) {
+      setError('Failed to add match. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const canSubmit = date && (teamYoungScore > 0 || teamOldScore > 0);
+  const { teamYoungScore, teamOldScore } = calculateScores();
+
+  if (!isAdminAuthenticated) {
+    return null;
+  }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Add Match</DialogTitle>
-      <form onSubmit={handleSubmit}>
-        <DialogContent>
-          <TextField
-            label="Date"
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            fullWidth
-            margin="normal"
-            required
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="Team Young Score"
-            type="number"
-            value={teamYoungScore}
-            fullWidth
-            margin="normal"
-            InputProps={{ readOnly: true }}
-          />
-          <TextField
-            label="Team Old Score"
-            type="number"
-            value={teamOldScore}
-            fullWidth
-            margin="normal"
-            InputProps={{ readOnly: true }}
-          />
-          <div style={{ marginTop: 16 }}>
-            <strong>Goalscorers for Team Young</strong>
-            {youngGoals.map((g, idx) => (
-              <div key={idx} style={{ display: "flex", alignItems: "center" }}>
-                <GoalInput
-                  players={players}
-                  value={g}
-                  onChange={val => handleGoalChange("young", idx, val)}
-                  team="young"
+    <Paper sx={{ p: 3, mb: 3 }}>
+      <Typography variant="h5" gutterBottom>
+        Add New Match
+      </Typography>
+
+      <Box component="form" onSubmit={handleSubmit}>
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+              disabled={loading}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="body2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Calculated Score:
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                <Typography component="span" sx={{ color: 'primary.main' }}>Team Old</Typography> {teamOldScore} : {teamYoungScore} <Typography component="span" sx={{ color: 'secondary.main' }}>Team Young</Typography>
+              </Typography>
+            </Box>
+          </Grid>
+        </Grid>
+
+        <Typography variant="h6" gutterBottom>
+          Goalscorers
+        </Typography>
+
+        {goalscorers.map((scorer, index) => (
+                          <Box key={index} sx={{ mb: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Player"
+                  value={scorer.player_id}
+                  onChange={(e) => updateGoalscorer(index, 'player_id', e.target.value)}
+                  disabled={loading}
+                >
+                  {players.map((player) => (
+                    <MenuItem key={player.id} value={player.id}>
+                      {player.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={2}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Team"
+                  value={scorer.team}
+                  onChange={(e) => updateGoalscorer(index, 'team', e.target.value)}
+                  disabled={loading}
+                >
+                  <MenuItem value="old">Team Old</MenuItem>
+                  <MenuItem value="young">Team Young</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={2}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Goals"
+                  value={scorer.goals}
+                  onChange={(e) => updateGoalscorer(index, 'goals', parseInt(e.target.value) || 0)}
+                  disabled={loading}
+                  inputProps={{ min: 0 }}
                 />
-                <IconButton onClick={() => handleRemoveGoal("young", idx)} size="small" color="error">
+              </Grid>
+              <Grid item xs={12} sm={2}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Own Goals"
+                  value={scorer.own_goals}
+                  onChange={(e) => updateGoalscorer(index, 'own_goals', parseInt(e.target.value) || 0)}
+                  disabled={loading}
+                  inputProps={{ min: 0 }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={2}>
+                <IconButton
+                  onClick={() => removeGoalscorer(index)}
+                  disabled={loading}
+                  color="error"
+                >
                   <RemoveIcon />
                 </IconButton>
-              </div>
-            ))}
-            <Button onClick={() => handleAddGoal("young")} startIcon={<AddIcon />} size="small" sx={{ mt: 1 }}>
-              Add Scorer
-            </Button>
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <strong>Goalscorers for Team Old</strong>
-            {oldGoals.map((g, idx) => (
-              <div key={idx} style={{ display: "flex", alignItems: "center" }}>
-                <GoalInput
-                  players={players}
-                  value={g}
-                  onChange={val => handleGoalChange("old", idx, val)}
-                  team="old"
-                />
-                <IconButton onClick={() => handleRemoveGoal("old", idx)} size="small" color="error">
-                  <RemoveIcon />
-                </IconButton>
-              </div>
-            ))}
-            <Button onClick={() => handleAddGoal("old")} startIcon={<AddIcon />} size="small" sx={{ mt: 1 }}>
-              Add Scorer
-            </Button>
-          </div>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose} disabled={loading}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={loading || !canSubmit}>
-            Add Match
+              </Grid>
+            </Grid>
+          </Box>
+        ))}
+
+        <Button
+          type="button"
+          onClick={addGoalscorer}
+          disabled={loading}
+          startIcon={<AddIcon />}
+          sx={{ mb: 2 }}
+        >
+          Add Goalscorer
+        </Button>
+
+        <Box sx={{ mb: 2 }}>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={loading || !canSubmit()}
+          >
+            {loading ? 'Adding Match...' : 'Add Match'}
           </Button>
-        </DialogActions>
-      </form>
-    </Dialog>
+        </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {success}
+          </Alert>
+        )}
+      </Box>
+    </Paper>
   );
-} 
+};
+
+export default MatchForm; 

@@ -1,10 +1,22 @@
-import React from "react";
-import MatchList from "../components/MatchList";
+import React from 'react';
+import { Box } from '@mui/material';
+import MatchForm from '../components/MatchForm';
+import MatchList from '../components/MatchList';
 
-export default function MatchesPage() {
+const MatchesPage = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
   return (
-    <div>
-      <MatchList />
-    </div>
+    <Box>
+      <MatchForm 
+        globalPassword={globalPassword}
+        isAdminAuthenticated={isAdminAuthenticated}
+      />
+      <MatchList 
+        globalPassword={globalPassword}
+        adminPassword={adminPassword}
+        isAdminAuthenticated={isAdminAuthenticated}
+      />
+    </Box>
   );
-} 
+};
+
+export default MatchesPage; 

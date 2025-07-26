@@ -1,152 +1,174 @@
-import React, { useEffect, useState } from "react";
-import { getMatches, addMatch, deleteAllMatches } from "../api";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import Paper from "@mui/material/Paper";
-import MatchModal from "./MatchModal";
-import MatchForm from "./MatchForm";
-import Button from "@mui/material/Button";
-import TableSortLabel from "@mui/material/TableSortLabel";
+import React, { useState, useEffect } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Typography,
+  Button,
+  Box,
+  Alert,
+  CircularProgress
+} from '@mui/material';
+import { getMatches, deleteAllMatches } from '../api';
+import MatchModal from './MatchModal';
 
-const columns = [
-  { id: "date", label: "Date" },
-  { id: "team_old_score", label: "Team Old Score (Old)" },
-  { id: "team_young_score", label: "Team Young Score (Young)" },
-  { id: "goal_diff", label: "Goal Difference" },
-];
-
-function descendingComparator(a, b, orderBy) {
-  if (orderBy === "date") {
-    return new Date(b.date) - new Date(a.date);
-  }
-  if (orderBy === "goal_diff") {
-    const diffA = Math.abs(a.team_old_score - a.team_young_score);
-    const diffB = Math.abs(b.team_old_score - b.team_young_score);
-    return diffB - diffA;
-  }
-  if (b[orderBy] < a[orderBy]) return -1;
-  if (b[orderBy] > a[orderBy]) return 1;
-  return 0;
-}
-
-function ascendingComparator(a, b, orderBy) {
-  if (orderBy === "date") {
-    return new Date(a.date) - new Date(b.date);
-  }
-  if (orderBy === "goal_diff") {
-    const diffA = Math.abs(a.team_old_score - a.team_young_score);
-    const diffB = Math.abs(b.team_old_score - b.team_young_score);
-    return diffA - diffB;
-  }
-  if (a[orderBy] < b[orderBy]) return -1;
-  if (a[orderBy] > b[orderBy]) return 1;
-  return 0;
-}
-
-export default function MatchList() {
+const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
   const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [selectedMatch, setSelectedMatch] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
-  const [orderBy, setOrderBy] = useState("date");
-  const [order, setOrder] = useState("desc");
+  const [showModal, setShowModal] = useState(false);
 
-  const fetchMatches = () => {
-    getMatches().then(setMatches);
+  const fetchMatches = async () => {
+    try {
+      const response = await getMatches(globalPassword);
+      if (response.ok) {
+        const data = await response.json();
+        // Sort matches by date (newest first)
+        const sortedMatches = data.sort((a, b) => new Date(b.date) - new Date(a.date));
+        setMatches(sortedMatches);
+      } else {
+        setError('Failed to load matches');
+      }
+    } catch (error) {
+      setError('Failed to load matches');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchMatches();
-  }, []);
+  }, [globalPassword]);
 
-  const handleRowClick = (match) => {
+  const handleMatchClick = (match) => {
     setSelectedMatch(match);
-    setModalOpen(true);
+    setShowModal(true);
   };
 
-  const handleModalClose = () => {
-    setModalOpen(false);
+  const handleCloseModal = () => {
+    setShowModal(false);
     setSelectedMatch(null);
   };
 
-  const handleFormOpen = () => setFormOpen(true);
-  const handleFormClose = () => setFormOpen(false);
-
-  const handleAddMatch = async (match) => {
-    await addMatch(match);
+  const handleMatchUpdated = () => {
     fetchMatches();
+    handleCloseModal();
   };
 
-  const handleDeleteAll = async () => {
-    if (window.confirm("Are you sure you want to delete ALL matches? This cannot be undone.")) {
-      await deleteAllMatches();
-      fetchMatches();
+  const handleDeleteAllMatches = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL matches? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await deleteAllMatches(adminPassword);
+      if (response.ok) {
+        setMatches([]);
+        alert('All matches deleted successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(errorData.detail || 'Failed to delete all matches');
+      }
+    } catch (error) {
+      alert('Failed to delete all matches');
     }
   };
 
-  const handleRequestSort = (property) => {
-    const isAsc = orderBy === property && order === "asc";
-    setOrder(isAsc ? "desc" : "asc");
-    setOrderBy(property);
-  };
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" p={3}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-  const sortedMatches = [...matches].sort((a, b) => {
-    if (order === "desc") return descendingComparator(a, b, orderBy);
-    return ascendingComparator(a, b, orderBy);
-  });
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ mb: 2 }}>
+        {error}
+      </Alert>
+    );
+  }
 
   return (
-    <div>
-      <h2>Matches</h2>
-      <Button variant="contained" onClick={handleFormOpen} sx={{ mb: 2, mr: 2 }}>
-        Add Match
-      </Button>
-      <Button variant="contained" color="error" onClick={handleDeleteAll} sx={{ mb: 2 }}>
-        Delete All Matches
-      </Button>
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              {columns.map((col) => (
-                <TableCell key={col.id} sortDirection={orderBy === col.id ? order : false}>
-                  <TableSortLabel
-                    active={orderBy === col.id}
-                    direction={orderBy === col.id ? order : "asc"}
-                    onClick={() => handleRequestSort(col.id)}
-                  >
-                    {col.label}
-                  </TableSortLabel>
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {sortedMatches.map((m) => (
-              <TableRow key={m.id} hover style={{ cursor: "pointer" }} onClick={() => handleRowClick(m)}>
-                <TableCell>{m.date}</TableCell>
-                <TableCell>{m.team_old_score}</TableCell>
-                <TableCell>{m.team_young_score}</TableCell>
-                <TableCell>{Math.abs(m.team_old_score - m.team_young_score)}</TableCell>
+    <Box>
+      <Typography variant="h5" gutterBottom>
+        Matches ({matches.length})
+      </Typography>
+
+      {isAdminAuthenticated && (
+        <Button
+          variant="outlined"
+          color="error"
+          onClick={handleDeleteAllMatches}
+          sx={{ mb: 2 }}
+        >
+          Delete All Matches
+        </Button>
+      )}
+
+      {matches.length === 0 ? (
+        <Typography variant="body1" color="text.secondary">
+          No matches found. {isAdminAuthenticated ? 'Add some matches to get started!' : 'Contact an admin to add matches.'}
+        </Typography>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Date</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Team Old Score</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Team Young Score</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Goal Difference</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Total Goals</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      <MatchModal
-        open={modalOpen}
-        onClose={handleModalClose}
-        match={selectedMatch}
-      />
-      <MatchForm
-        open={formOpen}
-        onClose={handleFormClose}
-        onMatchAdded={handleAddMatch}
-      />
-    </div>
+            </TableHead>
+            <TableBody>
+              {matches.map((match) => {
+                const goalDifference = Math.abs(match.team_old_score - match.team_young_score);
+                const totalGoals = match.team_old_score + match.team_young_score;
+                
+                return (
+                  <TableRow
+                    key={match.id}
+                    onClick={() => handleMatchClick(match)}
+                    sx={{
+                      cursor: 'pointer',
+                      '&:hover': {
+                        backgroundColor: 'action.hover',
+                      },
+                    }}
+                  >
+                    <TableCell>{match.date}</TableCell>
+                    <TableCell>{match.team_old_score}</TableCell>
+                    <TableCell>{match.team_young_score}</TableCell>
+                    <TableCell>{goalDifference}</TableCell>
+                    <TableCell>{totalGoals}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {selectedMatch && (
+        <MatchModal
+          open={showModal}
+          onClose={handleCloseModal}
+          match={selectedMatch}
+          adminPassword={adminPassword}
+          isAdminAuthenticated={isAdminAuthenticated}
+          onMatchUpdated={handleMatchUpdated}
+        />
+      )}
+    </Box>
   );
-} 
+};
+
+export default MatchList; 

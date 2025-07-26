@@ -1,152 +1,264 @@
-import React, { useState } from "react";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
-import Button from "@mui/material/Button";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import Paper from "@mui/material/Paper";
-import { updatePlayer, deletePlayer } from "../api";
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Typography,
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Alert
+} from '@mui/material';
+import { updatePlayer, deletePlayer } from '../api';
 
-export default function PlayerModal({ open, onClose, player, onUpdated, onDeleted }) {
-  const [editMode, setEditMode] = useState(false);
-  const [name, setName] = useState(player?.name || "");
-  const [birthdate, setBirthdate] = useState(player?.birthdate || "");
+const PlayerModal = ({ open, onClose, player, adminPassword, isAdminAuthenticated, onPlayerUpdated }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [name, setName] = useState(player?.name || '');
+  const [birthdate, setBirthdate] = useState(player?.birthdate || '');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  React.useEffect(() => {
-    setName(player?.name || "");
-    setBirthdate(player?.birthdate || "");
-    setEditMode(false);
-  }, [player, open]);
-
-  const handleSave = async () => {
-    setLoading(true);
-    await updatePlayer(player.id, { name, birthdate });
-    setLoading(false);
-    setEditMode(false);
-    if (onUpdated) onUpdated();
+  const formatBirthdate = (birthdateString) => {
+    if (!birthdateString) return '';
+    const date = new Date(birthdateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
-  const handleDelete = async () => {
-    if (window.confirm("Are you sure you want to delete this player?")) {
-      setLoading(true);
-      await deletePlayer(player.id);
+  const handleSave = async () => {
+    if (!name.trim() || !birthdate) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await updatePlayer(player.id, { name: name.trim(), birthdate }, adminPassword);
+      
+      if (response.ok) {
+        setIsEditing(false);
+        onPlayerUpdated();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.detail || 'Failed to update player');
+      }
+    } catch (error) {
+      setError('Failed to update player');
+    } finally {
       setLoading(false);
-      if (onDeleted) onDeleted();
-      onClose();
     }
   };
 
-  // Prepare goal/match details
-  let matchDetails = [];
-  if (player && Array.isArray(player.goals) && player.goals.length > 0) {
-    // Group goals by match
-    const matchMap = {};
-    player.goals.forEach(goal => {
-      if (!goal.match) return;
-      const matchId = goal.match.id;
-      if (!matchMap[matchId]) {
-        matchMap[matchId] = {
-          date: goal.match.date,
-          team: goal.team,
-          team_young_score: goal.match.team_young_score,
-          team_old_score: goal.match.team_old_score,
-          goals: 0,
-          own_goals: 0,
-        };
-      }
-      if (goal.is_own_goal) {
-        matchMap[matchId].own_goals += 1;
+  const handleDelete = async () => {
+    // Special handling for unknown player
+    if (player.name === "Unknown Player (Deleted)") {
+      setError('Cannot delete the Unknown Player. Use "Manage Unknown Goals" to reassign goals instead.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete ${player.name}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await deletePlayer(player.id, adminPassword);
+      
+      if (response.ok) {
+        const result = await response.json();
+        onClose();
+        onPlayerUpdated();
+        // Show success message if goals were reassigned
+        if (result.reassigned_goals > 0) {
+          alert(`Player deleted successfully. ${result.reassigned_goals} goals were reassigned to the Unknown Player.`);
+        }
       } else {
-        matchMap[matchId].goals += 1;
+        const errorData = await response.json();
+        setError(errorData.detail || 'Failed to delete player');
       }
-    });
-    matchDetails = Object.values(matchMap);
-  }
+    } catch (error) {
+      setError('Failed to delete player');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setName(player?.name || '');
+    setBirthdate(player?.birthdate || '');
+    setError('');
+  };
+
+  if (!player) return null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Player Details</DialogTitle>
+      <DialogTitle>
+        {isEditing ? 'Edit Player' : player.name}
+      </DialogTitle>
+      
       <DialogContent>
-        {editMode ? (
-          <>
+        {isEditing ? (
+          <Box sx={{ mb: 3 }}>
             <TextField
+              fullWidth
               label="Name"
               value={name}
-              onChange={e => setName(e.target.value)}
-              fullWidth
-              margin="normal"
-              required
+              onChange={(e) => setName(e.target.value)}
+              sx={{ mb: 2 }}
+              disabled={loading}
             />
             <TextField
+              fullWidth
               label="Birthdate"
               type="date"
               value={birthdate}
-              onChange={e => setBirthdate(e.target.value)}
-              fullWidth
-              margin="normal"
-              required
+              onChange={(e) => setBirthdate(e.target.value)}
               InputLabelProps={{ shrink: true }}
+              disabled={loading}
             />
-          </>
+            {error && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {error}
+              </Alert>
+            )}
+          </Box>
         ) : (
-          <>
-            <Typography variant="h6">{player?.name}</Typography>
-            <Typography variant="body1">Birthdate: {player?.birthdate}</Typography>
-            {matchDetails.length > 0 && (
-              <>
-                <Typography variant="subtitle1" sx={{ mt: 2 }}>Goals by Match</Typography>
-                <TableContainer component={Paper} sx={{ mt: 1, mb: 2 }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Team</TableCell>
-                        <TableCell>Endscore</TableCell>
-                        <TableCell>Goals</TableCell>
-                        <TableCell>Own Goals</TableCell>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body1" gutterBottom>
+              <strong>Name:</strong> {player.name}
+              {player.name === "Unknown Player (Deleted)" && (
+                <Typography 
+                  component="span" 
+                  sx={{ 
+                    color: 'warning.main', 
+                    ml: 1 
+                  }}
+                >
+                  (Goals from deleted players)
+                </Typography>
+              )}
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              <strong>Birthdate:</strong> {
+                player.name === "Unknown Player (Deleted)" 
+                  ? "Unknown (placeholder date)" 
+                  : formatBirthdate(player.birthdate)
+              }
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              <strong>Total Goals:</strong> {player.goals.filter(g => !g.is_own_goal).length}
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              <strong>Own Goals:</strong> {player.goals.filter(g => g.is_own_goal).length}
+            </Typography>
+          </Box>
+        )}
+
+        {player.goals.length > 0 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Goals by Match
+            </Typography>
+            <TableContainer component={Paper}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Team</TableCell>
+                    <TableCell>End Score</TableCell>
+                    <TableCell>Goals</TableCell>
+                    <TableCell>Own Goals</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(() => {
+                    // Group goals by match
+                    const goalsByMatch = {};
+                    player.goals.forEach(goal => {
+                      const matchId = goal.match?.id;
+                      if (!matchId) return;
+                      
+                      if (!goalsByMatch[matchId]) {
+                        goalsByMatch[matchId] = {
+                          matchId,
+                          date: goal.match.date,
+                          team: goal.team,
+                          endScore: `${goal.match.team_old_score}:${goal.match.team_young_score}`,
+                          goals: 0,
+                          ownGoals: 0
+                        };
+                      }
+                      
+                      if (goal.is_own_goal) {
+                        goalsByMatch[matchId].ownGoals++;
+                      } else {
+                        goalsByMatch[matchId].goals++;
+                      }
+                    });
+                    
+                    return Object.values(goalsByMatch).map((match) => (
+                      <TableRow key={match.matchId}>
+                        <TableCell>{match.date}</TableCell>
+                        <TableCell>{match.team}</TableCell>
+                        <TableCell>{match.endScore}</TableCell>
+                        <TableCell>{match.goals}</TableCell>
+                        <TableCell>{match.ownGoals}</TableCell>
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {matchDetails.map((m, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell>{m.date}</TableCell>
-                          <TableCell>{m.team}</TableCell>
-                          <TableCell>{m.team_young_score} : {m.team_old_score}</TableCell>
-                          <TableCell>{m.goals}</TableCell>
-                          <TableCell>{m.own_goals}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                    ));
+                  })()}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        )}
+      </DialogContent>
+
+      <DialogActions>
+        {isAdminAuthenticated && (
+          <>
+            {isEditing ? (
+              <>
+                <Button onClick={handleCancel} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} variant="contained" disabled={loading}>
+                  {loading ? 'Saving...' : 'Save'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button onClick={() => setIsEditing(true)}>
+                  Edit
+                </Button>
+                <Button onClick={handleDelete} color="error" disabled={loading}>
+                  {loading ? 'Deleting...' : 'Delete'}
+                </Button>
               </>
             )}
           </>
         )}
-      </DialogContent>
-      <DialogActions>
-        {editMode ? (
-          <>
-            <Button onClick={() => setEditMode(false)} disabled={loading}>Cancel</Button>
-            <Button onClick={handleSave} disabled={loading || !name || !birthdate} variant="contained">Save</Button>
-          </>
-        ) : (
-          <>
-            <Button onClick={() => setEditMode(true)}>Edit</Button>
-            <Button onClick={handleDelete} color="error">Delete</Button>
-            <Button onClick={onClose}>Close</Button>
-          </>
-        )}
+        <Button onClick={onClose}>
+          Close
+        </Button>
       </DialogActions>
     </Dialog>
   );
-} 
+};
+
+export default PlayerModal; 

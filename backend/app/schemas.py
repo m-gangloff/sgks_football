@@ -9,6 +9,12 @@ class ShallowMatch(BaseModel):
     team_old_score: int
     model_config = ConfigDict(from_attributes=True)
 
+class ShallowPlayer(BaseModel):
+    id: int
+    name: str
+    birthdate: date
+    model_config = ConfigDict(from_attributes=True)
+
 class GoalBase(BaseModel):
     player_id: int
     is_own_goal: bool = False
@@ -20,6 +26,7 @@ class GoalCreate(GoalBase):
 class Goal(GoalBase):
     id: int
     match: Optional[ShallowMatch] = None  # Only shallow info!
+    player: Optional[ShallowPlayer] = None  # Only shallow info!
     model_config = ConfigDict(from_attributes=True)
 
 class PlayerBase(BaseModel):
@@ -53,3 +60,4 @@ if TYPE_CHECKING:
 
 Goal.model_rebuild()
 Match.model_rebuild()
+Player.model_rebuild()

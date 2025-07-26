@@ -1,15 +1,22 @@
-import React, { useState } from "react";
-import PlayerList from "../components/PlayerList";
-import PlayerForm from "../components/PlayerForm";
+import React from 'react';
+import { Box } from '@mui/material';
+import PlayerForm from '../components/PlayerForm';
+import PlayerList from '../components/PlayerList';
 
-export default function PlayersPage() {
-  const [refresh, setRefresh] = useState(false);
-
+const PlayersPage = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
   return (
-    <div>
-      <h1>Players</h1>
-      <PlayerForm onPlayerAdded={() => setRefresh(r => !r)} />
-      <PlayerList key={refresh} />
-    </div>
+    <Box>
+      <PlayerForm 
+        globalPassword={globalPassword}
+        isAdminAuthenticated={isAdminAuthenticated}
+      />
+      <PlayerList 
+        globalPassword={globalPassword}
+        adminPassword={adminPassword}
+        isAdminAuthenticated={isAdminAuthenticated}
+      />
+    </Box>
   );
-} 
+};
+
+export default PlayersPage; 

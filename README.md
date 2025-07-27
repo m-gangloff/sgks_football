@@ -174,7 +174,7 @@ sgks_football/
 │   └── football.db          # SQLite database
 ├── frontend/
 │   ├── src/
-│   │   ├── components/      # React components
+│   │   ├── components/     # React components
 │   │   ├── pages/          # Page components
 │   │   ├── api/            # API functions
 │   │   └── App.jsx         # Main app component
@@ -184,12 +184,11 @@ sgks_football/
 
 ## Security Notes
 
-- Change the default passwords immediately
 - The global password should be shared only with team members
 - The admin password should be kept private
 - Authentication state is stored in browser localStorage
 - Each user's authentication is independent
-- Passwords are transmitted securely over HTTPS (in production)
+- Passwords are transmitted securely over HTTPS
 
 ## Future Enhancements
 

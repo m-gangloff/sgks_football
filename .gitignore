@@ -31,6 +31,7 @@ backend/.mypy_cache/
 backend/.pytest_cache/
 backend/.env
 backend/.DS_Store
+backend/gdrive_service_account.json
 
 # Node/React/Frontend
 frontend/node_modules/

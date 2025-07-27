@@ -79,7 +79,7 @@ The application requires environment variables for passwords. **No default passw
    uvicorn app.main:app --reload
    ```
 
-The backend will be available at `http://localhost:8000`
+The backend will be available at `http://localhost:10000`
 
 ### Frontend Setup
 

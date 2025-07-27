@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL;
 
 const LoginModal = ({ open, onClose, onGlobalAuth, onAdminAuth, isGlobalAuthenticated, isAdminAuthenticated, showAdminSection = false }) => {
   const [globalPassword, setGlobalPassword] = useState('');

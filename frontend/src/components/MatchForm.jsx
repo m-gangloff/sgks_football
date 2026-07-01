@@ -75,16 +75,13 @@ const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
   };
 
   const canSubmit = () => {
-    if (!date) return false;
-    return goalscorers.some(scorer => 
-      scorer.player_id && (scorer.goals > 0 || scorer.own_goals > 0)
-    );
+    return Boolean(date);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!canSubmit()) {
-      setError('Please fill in the date and add at least one goal');
+      setError('Please fill in the date');
       return;
     }
 

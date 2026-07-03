@@ -18,6 +18,26 @@ import MatchModal from './MatchModal';
 import SeasonSelector from './SeasonSelector';
 import { seasonsFromDates, isDateInSeason } from '../utils/season';
 
+// Compact metric tile used in the matches summary.
+const StatTile = ({ label, value, color }) => (
+  <Paper
+    variant="outlined"
+    sx={{
+      p: 1.5,
+      flex: '1 1 120px',
+      minWidth: 100,
+      textAlign: 'center',
+    }}
+  >
+    <Typography variant="h5" sx={{ fontWeight: 'bold', color: color || 'text.primary' }}>
+      {value}
+    </Typography>
+    <Typography variant="caption" color="text.secondary">
+      {label}
+    </Typography>
+  </Paper>
+);
+
 const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, selectedSeason, onSeasonChange }) => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +70,20 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, select
   // Seasons available in the data, and the matches for the selected season.
   const availableSeasons = seasonsFromDates(matches.map((m) => m.date));
   const filteredMatches = matches.filter((m) => isDateInSeason(m.date, selectedSeason));
+
+  // Season-aware summary across the filtered matches.
+  const summary = filteredMatches.reduce(
+    (acc, m) => {
+      acc.oldGoals += m.team_old_score;
+      acc.youngGoals += m.team_young_score;
+      if (m.team_old_score > m.team_young_score) acc.oldWins += 1;
+      else if (m.team_young_score > m.team_old_score) acc.youngWins += 1;
+      else acc.draws += 1;
+      return acc;
+    },
+    { oldGoals: 0, youngGoals: 0, oldWins: 0, youngWins: 0, draws: 0 }
+  );
+  const totalGoals = summary.oldGoals + summary.youngGoals;
 
   const handleMatchClick = (match) => {
     setSelectedMatch(match);
@@ -141,14 +175,33 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, select
             : 'No matches in this season. Try selecting a different season.'}
         </Typography>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
+        <>
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 1,
+              mb: 2,
+            }}
+          >
+            <StatTile label="Matches" value={filteredMatches.length} />
+            <StatTile label="Team Old Wins" value={summary.oldWins} />
+            <StatTile label="Team Young Wins" value={summary.youngWins} />
+            <StatTile label="Draws" value={summary.draws} />
+            <StatTile label="Total Goals" value={totalGoals} />
+            <StatTile label="Team Old Goals" value={summary.oldGoals} />
+            <StatTile label="Team Young Goals" value={summary.youngGoals} />
+          </Box>
+
+          <TableContainer component={Paper}>
+            <Table>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Date</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Team Old Score</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Team Young Score</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Goal Difference</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Winner</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Score Team Old</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Score Team Young</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Goal Diff</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'action.hover' }}>Total Goals</TableCell>
               </TableRow>
             </TableHead>
@@ -156,7 +209,13 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, select
               {filteredMatches.map((match) => {
                 const goalDifference = Math.abs(match.team_old_score - match.team_young_score);
                 const totalGoals = match.team_old_score + match.team_young_score;
-                
+                const winner =
+                  match.team_old_score > match.team_young_score
+                    ? 'Team Old'
+                    : match.team_young_score > match.team_old_score
+                    ? 'Team Young'
+                    : 'Draw';
+
                 return (
                   <TableRow
                     key={match.id}
@@ -169,6 +228,7 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, select
                     }}
                   >
                     <TableCell>{match.date}</TableCell>
+                    <TableCell>{winner}</TableCell>
                     <TableCell>{match.team_old_score}</TableCell>
                     <TableCell>{match.team_young_score}</TableCell>
                     <TableCell>{goalDifference}</TableCell>
@@ -177,8 +237,9 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, select
                 );
               })}
             </TableBody>
-          </Table>
-        </TableContainer>
+            </Table>
+          </TableContainer>
+        </>
       )}
 
       {selectedMatch && (

@@ -182,6 +182,7 @@ const PlayerModal = ({ open, onClose, player, adminPassword, isAdminAuthenticate
                     <TableCell>Date</TableCell>
                     <TableCell>Team</TableCell>
                     <TableCell>End Score</TableCell>
+                    <TableCell>Winner</TableCell>
                     <TableCell>Goals</TableCell>
                     <TableCell>Own Goals</TableCell>
                   </TableRow>
@@ -200,6 +201,8 @@ const PlayerModal = ({ open, onClose, player, adminPassword, isAdminAuthenticate
                           date: goal.match.date,
                           team: goal.team,
                           endScore: `${goal.match.team_old_score}:${goal.match.team_young_score}`,
+                          oldScore: goal.match.team_old_score,
+                          youngScore: goal.match.team_young_score,
                           goals: 0,
                           ownGoals: 0
                         };
@@ -212,15 +215,24 @@ const PlayerModal = ({ open, onClose, player, adminPassword, isAdminAuthenticate
                       }
                     });
                     
-                    return Object.values(goalsByMatch).map((match) => (
-                      <TableRow key={match.matchId}>
-                        <TableCell>{match.date}</TableCell>
-                        <TableCell>{match.team}</TableCell>
-                        <TableCell>{match.endScore}</TableCell>
-                        <TableCell>{match.goals}</TableCell>
-                        <TableCell>{match.ownGoals}</TableCell>
-                      </TableRow>
-                    ));
+                    return Object.values(goalsByMatch).map((match) => {
+                      const winner =
+                        match.oldScore > match.youngScore
+                          ? 'Team Old'
+                          : match.youngScore > match.oldScore
+                          ? 'Team Young'
+                          : 'Draw';
+                      return (
+                        <TableRow key={match.matchId}>
+                          <TableCell>{match.date}</TableCell>
+                          <TableCell>{match.team}</TableCell>
+                          <TableCell>{match.endScore}</TableCell>
+                          <TableCell>{winner}</TableCell>
+                          <TableCell>{match.goals}</TableCell>
+                          <TableCell>{match.ownGoals}</TableCell>
+                        </TableRow>
+                      );
+                    });
                   })()}
                 </TableBody>
               </Table>

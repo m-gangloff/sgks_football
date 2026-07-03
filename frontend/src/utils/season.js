@@ -52,3 +52,31 @@ export function isDateInSeason(dateInput, seasonStartYear) {
   if (seasonStartYear === ALL_SEASONS || seasonStartYear == null) return true;
   return getSeasonStartYear(dateInput) === seasonStartYear;
 }
+
+// Effective "hidden" state of a player for a season, given the sparse list of
+// visibility overrides ([{ player_id, season_start_year, hidden }]).
+//
+// The most recent override in any season <= the viewed one wins; if there is
+// none, the player is visible. This makes a season inherit the previous
+// season's state until an admin changes it. "All time" never hides anyone.
+export function isPlayerHidden(overrides, playerId, seasonStartYear) {
+  if (seasonStartYear === ALL_SEASONS || seasonStartYear == null) return false;
+  let best = null;
+  for (const o of overrides) {
+    if (o.player_id !== playerId) continue;
+    if (o.season_start_year > seasonStartYear) continue;
+    if (!best || o.season_start_year > best.season_start_year) best = o;
+  }
+  return best ? best.hidden : false;
+}
+
+// The explicit override for a player in exactly this season, or null if the
+// state is inherited from an earlier season / the default.
+export function getExplicitOverride(overrides, playerId, seasonStartYear) {
+  if (seasonStartYear === ALL_SEASONS || seasonStartYear == null) return null;
+  return (
+    overrides.find(
+      (o) => o.player_id === playerId && o.season_start_year === seasonStartYear
+    ) || null
+  );
+}

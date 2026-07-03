@@ -37,11 +37,17 @@ def delete_player(db: Session, player_id: int):
     
     # Reassign all goals from this player to unknown player
     goals_to_reassign = db.query(models.Goal).filter(models.Goal.player_id == player_id).all()
-    
+
     # Update goals in a separate transaction to ensure they're saved
     for goal in goals_to_reassign:
         goal.player_id = unknown_player.id
-    
+
+    # Remove this player's visibility overrides (goals move to unknown player,
+    # but visibility rows are player-specific and would otherwise be orphaned).
+    db.query(models.PlayerVisibility).filter(
+        models.PlayerVisibility.player_id == player_id
+    ).delete()
+
     # Commit the goal reassignments first
     db.commit()
     
@@ -93,6 +99,47 @@ def delete_match(db: Session, match_id: int):
         "deleted_match": f"{match.date} - {match.team_old_score}:{match.team_young_score}",
         "deleted_goals": goals_deleted
     }
+
+def get_player_visibility(db: Session):
+    """Return all per-season visibility overrides."""
+    return db.query(models.PlayerVisibility).all()
+
+def set_player_visibility(db: Session, player_id: int, season_start_year: int, hidden: bool):
+    """Upsert a visibility override for a player in a specific season."""
+    player = db.query(models.Player).filter(models.Player.id == player_id).first()
+    if not player:
+        return None
+
+    row = db.query(models.PlayerVisibility).filter(
+        models.PlayerVisibility.player_id == player_id,
+        models.PlayerVisibility.season_start_year == season_start_year,
+    ).first()
+
+    if row:
+        row.hidden = hidden
+    else:
+        row = models.PlayerVisibility(
+            player_id=player_id,
+            season_start_year=season_start_year,
+            hidden=hidden,
+        )
+        db.add(row)
+
+    db.commit()
+    db.refresh(row)
+    return row
+
+def clear_player_visibility(db: Session, player_id: int, season_start_year: int):
+    """Remove an explicit override so the season reverts to the inherited state."""
+    row = db.query(models.PlayerVisibility).filter(
+        models.PlayerVisibility.player_id == player_id,
+        models.PlayerVisibility.season_start_year == season_start_year,
+    ).first()
+    if not row:
+        return None
+    db.delete(row)
+    db.commit()
+    return True
 
 def get_unknown_player_goals(db: Session):
     """Get all goals assigned to the unknown player."""

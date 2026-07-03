@@ -110,6 +110,35 @@ export const addDefaultPlayers = async (adminPassword) => {
   return response;
 };
 
+// Player visibility (per-season) functions
+export const getPlayerVisibility = async (globalPassword) => {
+  const response = await fetch(`${API_URL}/player-visibility/`, {
+    headers: getAuthHeaders(globalPassword),
+  });
+  return response;
+};
+
+export const setPlayerVisibility = async (playerId, seasonStartYear, hidden, adminPassword) => {
+  const response = await fetch(`${API_URL}/player-visibility/`, {
+    method: 'PUT',
+    headers: getAuthHeaders(null, adminPassword),
+    body: JSON.stringify({
+      player_id: playerId,
+      season_start_year: seasonStartYear,
+      hidden,
+    }),
+  });
+  return response;
+};
+
+export const clearPlayerVisibility = async (playerId, seasonStartYear, adminPassword) => {
+  const response = await fetch(`${API_URL}/player-visibility/${playerId}/${seasonStartYear}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(null, adminPassword),
+  });
+  return response;
+};
+
 // Match functions
 export const getMatches = async (globalPassword) => {
   const response = await fetch(`${API_URL}/matches/`, {

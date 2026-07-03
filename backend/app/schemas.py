@@ -41,6 +41,15 @@ class Player(PlayerBase):
     goals: List[Goal] = []
     model_config = ConfigDict(from_attributes=True)
 
+class PlayerVisibilityBase(BaseModel):
+    player_id: int
+    season_start_year: int
+    hidden: bool
+
+class PlayerVisibility(PlayerVisibilityBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
 class MatchBase(BaseModel):
     date: date
     team_young_score: int

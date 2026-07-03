@@ -46,4 +46,22 @@ class Goal(Base):
     is_own_goal = Column(Boolean, default=False)
     team = Column(String)  # 'young' or 'old'
     match = relationship("Match", back_populates="goals")
-    player = relationship("Player", back_populates="goals") 
+    player = relationship("Player", back_populates="goals")
+
+class PlayerVisibility(Base):
+    """Per-season override for whether a player is hidden from the roster UI.
+
+    Stored sparsely: a row exists only where an admin explicitly set the state
+    for that season. Effective visibility is computed as the most recent
+    override in any season <= the one being viewed (default: visible). This
+    makes a season inherit the previous season's state until changed.
+    """
+    __tablename__ = "player_visibility"
+    id = Column(Integer, primary_key=True, index=True)
+    player_id = Column(Integer, ForeignKey("players.id"), nullable=False)
+    season_start_year = Column(Integer, nullable=False)
+    hidden = Column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        UniqueConstraint('player_id', 'season_start_year', name='uq_player_visibility_season'),
+    )

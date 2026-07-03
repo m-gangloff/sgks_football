@@ -292,6 +292,28 @@ def list_backups(global_auth: bool = Depends(get_global_auth)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list backups: {str(e)}")
 
+# Player visibility (per-season) endpoints
+@app.get("/player-visibility/", response_model=List[schemas.PlayerVisibility])
+def read_player_visibility(db: Session = Depends(get_db), global_auth: bool = Depends(get_global_auth)):
+    """List all per-season player visibility overrides."""
+    return crud.get_player_visibility(db)
+
+@app.put("/player-visibility/", response_model=schemas.PlayerVisibility)
+def set_player_visibility(payload: schemas.PlayerVisibilityBase, db: Session = Depends(get_db), admin_auth: bool = Depends(get_admin_auth)):
+    """Set (upsert) a player's visibility for a specific season."""
+    result = crud.set_player_visibility(db, payload.player_id, payload.season_start_year, payload.hidden)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return result
+
+@app.delete("/player-visibility/{player_id}/{season_start_year}")
+def clear_player_visibility(player_id: int, season_start_year: int, db: Session = Depends(get_db), admin_auth: bool = Depends(get_admin_auth)):
+    """Clear a player's override for a season, reverting to the inherited state."""
+    result = crud.clear_player_visibility(db, player_id, season_start_year)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No override found for this player and season")
+    return {"cleared": True}
+
 # Unknown player management endpoints
 @app.get("/unknown-player/goals")
 def get_unknown_player_goals(db: Session = Depends(get_db), global_auth: bool = Depends(get_global_auth)):

@@ -9,19 +9,22 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import { getPlayers, deleteAllPlayers, addDefaultPlayers } from '../api';
+import { getPlayers, getPlayerVisibility, deleteAllPlayers, addDefaultPlayers } from '../api';
 import PlayerModal from './PlayerModal';
 import UnknownPlayerManager from './UnknownPlayerManager';
 import SeasonSelector from './SeasonSelector';
-import { seasonsFromDates, isDateInSeason } from '../utils/season';
+import PlayerVisibilityManager from './PlayerVisibilityManager';
+import { seasonsFromDates, isDateInSeason, isPlayerHidden, ALL_SEASONS } from '../utils/season';
 
 const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selectedSeason, onSeasonChange }) => {
   const [players, setPlayers] = useState([]);
+  const [visibility, setVisibility] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showUnknownPlayerManager, setShowUnknownPlayerManager] = useState(false);
+  const [showVisibilityManager, setShowVisibilityManager] = useState(false);
 
   const handleOpenUnknownPlayerManager = () => {
     setShowUnknownPlayerManager(true);
@@ -44,8 +47,20 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
     }
   };
 
+  const fetchVisibility = async () => {
+    try {
+      const response = await getPlayerVisibility(globalPassword);
+      if (response.ok) {
+        setVisibility(await response.json());
+      }
+    } catch (error) {
+      // Non-fatal: without overrides everyone is treated as visible.
+    }
+  };
+
   useEffect(() => {
     fetchPlayers();
+    fetchVisibility();
   }, [globalPassword]);
 
   // Seasons available across all goals (derived from each goal's match date).
@@ -66,6 +81,13 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
       const bGoals = b.goals.filter((g) => !g.is_own_goal).length;
       return bGoals - aGoals;
     });
+
+  // Roster shown in the UI hides players marked hidden for the selected season.
+  const visiblePlayers = seasonPlayers.filter(
+    (p) => !isPlayerHidden(visibility, p.id, selectedSeason)
+  );
+  const hiddenCount = seasonPlayers.length - visiblePlayers.length;
+  const canManageVisibility = isAdminAuthenticated && selectedSeason !== ALL_SEASONS;
 
   const handlePlayerClick = (player) => {
     setSelectedPlayer(player);
@@ -166,7 +188,12 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
         }}
       >
         <Typography variant="h5" gutterBottom sx={{ mb: 0 }}>
-          Players ({players.length})
+          Players ({visiblePlayers.length})
+          {isAdminAuthenticated && hiddenCount > 0 && (
+            <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+              ({hiddenCount} hidden)
+            </Typography>
+          )}
         </Typography>
         <SeasonSelector
           value={selectedSeason}
@@ -207,16 +234,28 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
           >
             Manage Unknown Goals
           </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => setShowVisibilityManager(true)}
+            disabled={!canManageVisibility}
+            title={canManageVisibility ? undefined : 'Select a specific season to manage active players'}
+            sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+          >
+            Manage Active Players
+          </Button>
         </Box>
       )}
 
-      {players.length === 0 ? (
+      {visiblePlayers.length === 0 ? (
         <Typography variant="body1" color="text.secondary">
-          No players found. {isAdminAuthenticated ? 'Add some players to get started!' : 'Contact an admin to add players.'}
+          {players.length === 0
+            ? `No players found. ${isAdminAuthenticated ? 'Add some players to get started!' : 'Contact an admin to add players.'}`
+            : 'No active players for this season.'}
         </Typography>
       ) : (
         <List>
-          {seasonPlayers.map((player) => {
+          {visiblePlayers.map((player) => {
             const nonOwnGoals = player.goals.filter(g => !g.is_own_goal).length;
             const ownGoals = player.goals.filter(g => g.is_own_goal).length;
             
@@ -300,6 +339,18 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
         isAdminAuthenticated={isAdminAuthenticated}
         onGoalsReassigned={fetchPlayers}
       />
+
+      {canManageVisibility && (
+        <PlayerVisibilityManager
+          open={showVisibilityManager}
+          onClose={() => setShowVisibilityManager(false)}
+          players={players}
+          overrides={visibility}
+          selectedSeason={selectedSeason}
+          adminPassword={adminPassword}
+          onChanged={fetchVisibility}
+        />
+      )}
     </Box>
   );
 };

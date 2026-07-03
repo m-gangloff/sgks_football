@@ -8,6 +8,7 @@ A web application for tracking football statistics for your handball club, speci
 - **Match Tracking**: Record matches with detailed goalscorer information
 - **Statistics**: View player statistics including goals and own goals per match
 - **Season Filter**: Filter players and matches by season (seasons run mid-June to mid-June)
+- **Per-Season Roster**: Admins can hide/show players per season; hidden players stay in the database and carry over to later seasons until changed
 - **Backup System**: Create and download database backups
 - **Authentication**: Two-tier password protection for data security
 

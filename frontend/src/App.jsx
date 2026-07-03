@@ -5,6 +5,7 @@ import PlayersPage from './pages/PlayersPage';
 import MatchesPage from './pages/MatchesPage';
 import BackupManager from './components/BackupManager';
 import LoginModal from './components/LoginModal';
+import { getCurrentSeasonStartYear, ALL_SEASONS } from './utils/season';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('players');
@@ -14,13 +15,16 @@ function App() {
   const [adminPassword, setAdminPassword] = useState('');
   const [showLoginModal, setShowLoginModal] = useState(true);
   const [darkMode, setDarkMode] = useState(true); // Default to dark mode
+  // Season to filter stats by; shared across pages and persisted.
+  const [selectedSeason, setSelectedSeason] = useState(getCurrentSeasonStartYear());
 
   // Check for stored preferences on app load
   useEffect(() => {
     const storedGlobalPassword = localStorage.getItem('globalPassword');
     const storedAdminPassword = localStorage.getItem('adminPassword');
     const storedDarkMode = localStorage.getItem('darkMode');
-    
+    const storedSeason = localStorage.getItem('selectedSeason');
+
     if (storedGlobalPassword) {
       setGlobalPassword(storedGlobalPassword);
       setIsGlobalAuthenticated(true);
@@ -28,7 +32,7 @@ function App() {
     } else {
       setShowLoginModal(true);
     }
-    
+
     if (storedAdminPassword) {
       setAdminPassword(storedAdminPassword);
       setIsAdminAuthenticated(true);
@@ -38,7 +42,17 @@ function App() {
     if (storedDarkMode !== null) {
       setDarkMode(storedDarkMode === 'true');
     }
+
+    // Restore season filter (stored as "all" or a numeric start year).
+    if (storedSeason !== null) {
+      setSelectedSeason(storedSeason === ALL_SEASONS ? ALL_SEASONS : Number(storedSeason));
+    }
   }, []);
+
+  const handleSeasonChange = (season) => {
+    setSelectedSeason(season);
+    localStorage.setItem('selectedSeason', season.toString());
+  };
 
   const handleToggleDarkMode = () => {
     const newDarkMode = !darkMode;
@@ -158,18 +172,22 @@ function App() {
         />
         
         {currentPage === 'players' && (
-          <PlayersPage 
+          <PlayersPage
             globalPassword={globalPassword}
             adminPassword={adminPassword}
             isAdminAuthenticated={isAdminAuthenticated}
+            selectedSeason={selectedSeason}
+            onSeasonChange={handleSeasonChange}
           />
         )}
-        
+
         {currentPage === 'matches' && (
-          <MatchesPage 
+          <MatchesPage
             globalPassword={globalPassword}
             adminPassword={adminPassword}
             isAdminAuthenticated={isAdminAuthenticated}
+            selectedSeason={selectedSeason}
+            onSeasonChange={handleSeasonChange}
           />
         )}
         

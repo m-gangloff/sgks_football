@@ -3,17 +3,19 @@ import { Box } from '@mui/material';
 import MatchForm from '../components/MatchForm';
 import MatchList from '../components/MatchList';
 
-const MatchesPage = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
+const MatchesPage = ({ globalPassword, adminPassword, isAdminAuthenticated, selectedSeason, onSeasonChange }) => {
   return (
     <Box>
-      <MatchForm 
+      <MatchForm
         globalPassword={globalPassword}
         isAdminAuthenticated={isAdminAuthenticated}
       />
-      <MatchList 
+      <MatchList
         globalPassword={globalPassword}
         adminPassword={adminPassword}
         isAdminAuthenticated={isAdminAuthenticated}
+        selectedSeason={selectedSeason}
+        onSeasonChange={onSeasonChange}
       />
     </Box>
   );

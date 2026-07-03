@@ -15,8 +15,10 @@ import {
 } from '@mui/material';
 import { getMatches, deleteAllMatches } from '../api';
 import MatchModal from './MatchModal';
+import SeasonSelector from './SeasonSelector';
+import { seasonsFromDates, isDateInSeason } from '../utils/season';
 
-const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
+const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, selectedSeason, onSeasonChange }) => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,6 +46,10 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
   useEffect(() => {
     fetchMatches();
   }, [globalPassword]);
+
+  // Seasons available in the data, and the matches for the selected season.
+  const availableSeasons = seasonsFromDates(matches.map((m) => m.date));
+  const filteredMatches = matches.filter((m) => isDateInSeason(m.date, selectedSeason));
 
   const handleMatchClick = (match) => {
     setSelectedMatch(match);
@@ -97,9 +103,25 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        Matches ({matches.length})
-      </Typography>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          justifyContent: 'space-between',
+          gap: 1,
+          mb: 1,
+        }}
+      >
+        <Typography variant="h5" gutterBottom sx={{ mb: 0 }}>
+          Matches ({filteredMatches.length})
+        </Typography>
+        <SeasonSelector
+          value={selectedSeason}
+          onChange={onSeasonChange}
+          seasons={availableSeasons}
+        />
+      </Box>
 
       {isAdminAuthenticated && (
         <Button
@@ -112,9 +134,11 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
         </Button>
       )}
 
-      {matches.length === 0 ? (
+      {filteredMatches.length === 0 ? (
         <Typography variant="body1" color="text.secondary">
-          No matches found. {isAdminAuthenticated ? 'Add some matches to get started!' : 'Contact an admin to add matches.'}
+          {matches.length === 0
+            ? `No matches found. ${isAdminAuthenticated ? 'Add some matches to get started!' : 'Contact an admin to add matches.'}`
+            : 'No matches in this season. Try selecting a different season.'}
         </Typography>
       ) : (
         <TableContainer component={Paper}>
@@ -129,7 +153,7 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {matches.map((match) => {
+              {filteredMatches.map((match) => {
                 const goalDifference = Math.abs(match.team_old_score - match.team_young_score);
                 const totalGoals = match.team_old_score + match.team_young_score;
                 

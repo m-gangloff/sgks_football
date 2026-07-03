@@ -3,17 +3,19 @@ import { Box } from '@mui/material';
 import PlayerForm from '../components/PlayerForm';
 import PlayerList from '../components/PlayerList';
 
-const PlayersPage = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
+const PlayersPage = ({ globalPassword, adminPassword, isAdminAuthenticated, selectedSeason, onSeasonChange }) => {
   return (
     <Box>
-      <PlayerForm 
+      <PlayerForm
         globalPassword={globalPassword}
         isAdminAuthenticated={isAdminAuthenticated}
       />
-      <PlayerList 
+      <PlayerList
         globalPassword={globalPassword}
         adminPassword={adminPassword}
         isAdminAuthenticated={isAdminAuthenticated}
+        selectedSeason={selectedSeason}
+        onSeasonChange={onSeasonChange}
       />
     </Box>
   );

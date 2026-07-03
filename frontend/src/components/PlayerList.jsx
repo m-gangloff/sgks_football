@@ -12,8 +12,10 @@ import {
 import { getPlayers, deleteAllPlayers, addDefaultPlayers } from '../api';
 import PlayerModal from './PlayerModal';
 import UnknownPlayerManager from './UnknownPlayerManager';
+import SeasonSelector from './SeasonSelector';
+import { seasonsFromDates, isDateInSeason } from '../utils/season';
 
-const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => {
+const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selectedSeason, onSeasonChange }) => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,13 +32,8 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => 
       const response = await getPlayers(globalPassword);
       if (response.ok) {
         const data = await response.json();
-        // Sort players by non-own goals (descending)
-        const sortedPlayers = data.sort((a, b) => {
-          const aGoals = a.goals.filter(g => !g.is_own_goal).length;
-          const bGoals = b.goals.filter(g => !g.is_own_goal).length;
-          return bGoals - aGoals;
-        });
-        setPlayers(sortedPlayers);
+        // Store raw players; season filtering and sorting happen at render time.
+        setPlayers(data);
       } else {
         setError('Failed to load players');
       }
@@ -50,6 +47,25 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => 
   useEffect(() => {
     fetchPlayers();
   }, [globalPassword]);
+
+  // Seasons available across all goals (derived from each goal's match date).
+  const availableSeasons = seasonsFromDates(
+    players.flatMap((p) => p.goals.map((g) => g.match?.date))
+  );
+
+  // Each player with their goals restricted to the selected season, sorted by
+  // non-own goals scored that season (descending). The selection is shared, so
+  // the per-player modal receives the same season-filtered goals.
+  const seasonPlayers = players
+    .map((player) => ({
+      ...player,
+      goals: player.goals.filter((g) => isDateInSeason(g.match?.date, selectedSeason)),
+    }))
+    .sort((a, b) => {
+      const aGoals = a.goals.filter((g) => !g.is_own_goal).length;
+      const bGoals = b.goals.filter((g) => !g.is_own_goal).length;
+      return bGoals - aGoals;
+    });
 
   const handlePlayerClick = (player) => {
     setSelectedPlayer(player);
@@ -139,9 +155,25 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => 
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        Players ({players.length})
-      </Typography>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          justifyContent: 'space-between',
+          gap: 1,
+          mb: 1,
+        }}
+      >
+        <Typography variant="h5" gutterBottom sx={{ mb: 0 }}>
+          Players ({players.length})
+        </Typography>
+        <SeasonSelector
+          value={selectedSeason}
+          onChange={onSeasonChange}
+          seasons={availableSeasons}
+        />
+      </Box>
 
       {isAdminAuthenticated && (
         <Box sx={{ 
@@ -184,7 +216,7 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated }) => 
         </Typography>
       ) : (
         <List>
-          {players.map((player) => {
+          {seasonPlayers.map((player) => {
             const nonOwnGoals = player.goals.filter(g => !g.is_own_goal).length;
             const ownGoals = player.goals.filter(g => g.is_own_goal).length;
             

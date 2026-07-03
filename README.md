@@ -7,6 +7,7 @@ A web application for tracking football statistics for your handball club, speci
 - **Player Management**: Add, edit, and delete players with birthdate information
 - **Match Tracking**: Record matches with detailed goalscorer information
 - **Statistics**: View player statistics including goals and own goals per match
+- **Season Filter**: Filter players and matches by season (seasons run mid-June to mid-June)
 - **Backup System**: Create and download database backups
 - **Authentication**: Two-tier password protection for data security
 
@@ -56,27 +57,23 @@ The application requires environment variables for passwords. **No default passw
 
 ### Backend Setup
 
-1. **Create Conda Environment**:
-   ```bash
-   conda create -n sgks_football python=3.11
-   conda activate sgks_football
-   ```
-
-2. **Install Dependencies**:
+1. **Install Dependencies with uv**:
    ```bash
    cd backend
-   pip install -r requirements.txt
+   uv sync
    ```
 
-3. **Set Up Environment Variables**:
+   This creates a virtual environment (`.venv`) and installs all dependencies from `pyproject.toml`. To include development dependencies (e.g. pytest), run `uv sync --extra dev`.
+
+2. **Set Up Environment Variables**:
    ```bash
    cp .env.sample .env
    # Edit .env file with your actual passwords
    ```
 
-4. **Run Backend**:
+3. **Run Backend**:
    ```bash
-   uvicorn app.main:app --reload
+   uv run uvicorn app.main:app --reload
    ```
 
 The backend will be available at `http://localhost:10000`
@@ -156,7 +153,7 @@ The application uses SQLite for data storage. The database file is located at `b
 Run the backend tests:
 ```bash
 cd backend
-PYTHONPATH=. pytest
+PYTHONPATH=. uv run pytest
 ```
 
 ## File Structure
@@ -170,7 +167,7 @@ sgks_football/
 │   │   ├── schemas.py       # Pydantic schemas
 │   │   ├── crud.py          # Database operations
 │   │   └── database.py      # Database configuration
-│   ├── requirements.txt     # Python dependencies
+│   ├── pyproject.toml       # Python project & dependencies
 │   └── football.db          # SQLite database
 ├── frontend/
 │   ├── src/

@@ -5,6 +5,7 @@ import PlayersPage from './pages/PlayersPage';
 import MatchesPage from './pages/MatchesPage';
 import BackupManager from './components/BackupManager';
 import LoginModal from './components/LoginModal';
+import StatsPage from './components/StatsPage';
 import { getCurrentSeasonStartYear, ALL_SEASONS } from './utils/season';
 
 function App() {
@@ -206,6 +207,14 @@ function App() {
             globalPassword={globalPassword}
             adminPassword={adminPassword}
             isAdminAuthenticated={isAdminAuthenticated}
+            selectedSeason={selectedSeason}
+            onSeasonChange={handleSeasonChange}
+          />
+        )}
+
+        {currentPage === 'stats' && (
+          <StatsPage
+            globalPassword={globalPassword}
             selectedSeason={selectedSeason}
             onSeasonChange={handleSeasonChange}
           />

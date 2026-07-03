@@ -12,6 +12,17 @@ export function ageInYears(birthdate) {
   return age;
 }
 
+// Exact (fractional) age in years — used where a continuous value reads better
+// than whole years (e.g. the age/goals scatter).
+export function ageInYearsExact(birthdate) {
+  if (!birthdate) return null;
+  const b = new Date(birthdate);
+  if (Number.isNaN(b.getTime())) return null;
+  const ms = Date.now() - b.getTime();
+  if (ms < 0) return null;
+  return ms / (365.25 * 24 * 3600 * 1000);
+}
+
 function median(numbers) {
   if (!numbers.length) return null;
   const sorted = [...numbers].sort((a, b) => a - b);

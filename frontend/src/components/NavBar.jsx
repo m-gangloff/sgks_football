@@ -79,6 +79,7 @@ const NavBar = ({
         >
           <Tab label="Players" value="players" />
           <Tab label="Matches" value="matches" />
+          <Tab label="Stats" value="stats" />
           {isAdminAuthenticated && <Tab label="Backups" value="backups" />}
         </Tabs>
 

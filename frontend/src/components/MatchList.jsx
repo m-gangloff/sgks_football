@@ -247,6 +247,7 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, select
           open={showModal}
           onClose={handleCloseModal}
           match={selectedMatch}
+          globalPassword={globalPassword}
           adminPassword={adminPassword}
           isAdminAuthenticated={isAdminAuthenticated}
           onMatchUpdated={handleMatchUpdated}

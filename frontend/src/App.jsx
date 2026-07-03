@@ -60,10 +60,28 @@ function App() {
     localStorage.setItem('darkMode', newDarkMode.toString());
   };
 
-  // Create theme based on dark mode preference
+  // Create theme based on dark mode preference. Modern refresh: green accent,
+  // rounded surfaces, softer background, cleaner typography.
   const theme = createTheme({
     palette: {
       mode: darkMode ? 'dark' : 'light',
+      primary: { main: darkMode ? '#66bb6a' : '#2e7d32' },
+      secondary: { main: '#f9a825' },
+      ...(darkMode
+        ? { background: { default: '#121417', paper: '#1c1f24' } }
+        : { background: { default: '#f4f6f8', paper: '#ffffff' } }),
+    },
+    shape: { borderRadius: 12 },
+    typography: {
+      fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      h5: { fontWeight: 700 },
+      h6: { fontWeight: 700 },
+      button: { textTransform: 'none', fontWeight: 600 },
+    },
+    components: {
+      MuiAppBar: { defaultProps: { elevation: 0 } },
+      MuiButton: { defaultProps: { disableElevation: true } },
+      MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
     },
   });
 
@@ -152,25 +170,27 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ 
-        mt: 2, 
-        mb: 2, 
-        px: { xs: 1, sm: 2, md: 3, lg: 4 }, 
-        width: '100%',
-        maxWidth: '100%',
-        boxSizing: 'border-box'
-      }}>
-        <NavBar 
-          currentPage={currentPage} 
-          onPageChange={setCurrentPage}
-          isAdminAuthenticated={isAdminAuthenticated}
-          onLogout={handleLogout}
-          onLogoutAdmin={handleLogoutAdmin}
-          onEnableAdmin={handleEnableAdmin}
-          darkMode={darkMode}
-          onToggleDarkMode={handleToggleDarkMode}
-        />
-        
+      <NavBar
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+        isAdminAuthenticated={isAdminAuthenticated}
+        onLogout={handleLogout}
+        onLogoutAdmin={handleLogoutAdmin}
+        onEnableAdmin={handleEnableAdmin}
+        darkMode={darkMode}
+        onToggleDarkMode={handleToggleDarkMode}
+      />
+
+      <Box
+        sx={{
+          maxWidth: 1100,
+          mx: 'auto',
+          width: '100%',
+          px: { xs: 2, sm: 3 },
+          py: { xs: 2, sm: 3 },
+          boxSizing: 'border-box',
+        }}
+      >
         {currentPage === 'players' && (
           <PlayersPage
             globalPassword={globalPassword}
@@ -190,16 +210,16 @@ function App() {
             onSeasonChange={handleSeasonChange}
           />
         )}
-        
+
         {currentPage === 'backups' && (
-          <BackupManager 
+          <BackupManager
             globalPassword={globalPassword}
             adminPassword={adminPassword}
             isAdminAuthenticated={isAdminAuthenticated}
           />
         )}
       </Box>
-      
+
       <LoginModal
         open={showLoginModal}
         onClose={() => {

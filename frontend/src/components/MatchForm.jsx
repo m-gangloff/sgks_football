@@ -12,11 +12,14 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
-import { createMatch, getPlayers } from '../api';
+import { createMatch, getPlayers, getPlayerVisibility } from '../api';
+import { isPlayerHidden, getSeasonStartYear, getCurrentSeasonStartYear } from '../utils/season';
+import { suggestTeamForPlayer } from '../utils/team';
 
 const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
   const [date, setDate] = useState('');
   const [players, setPlayers] = useState([]);
+  const [visibility, setVisibility] = useState([]);
   const [goalscorers, setGoalscorers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,6 +27,7 @@ const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
 
   useEffect(() => {
     fetchPlayers();
+    fetchVisibility();
   }, [globalPassword]);
 
   const fetchPlayers = async () => {
@@ -38,10 +42,21 @@ const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
     }
   };
 
+  const fetchVisibility = async () => {
+    try {
+      const response = await getPlayerVisibility(globalPassword);
+      if (response.ok) {
+        setVisibility(await response.json());
+      }
+    } catch (error) {
+      // Non-fatal: without overrides everyone is treated as active.
+    }
+  };
+
   const addGoalscorer = () => {
     setGoalscorers([
       ...goalscorers,
-      { player_id: '', team: 'young', goals: 0, own_goals: 0 }
+      { player_id: '', team: '', goals: 0, own_goals: 0 }
     ]);
   };
 
@@ -55,12 +70,27 @@ const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
     setGoalscorers(updated);
   };
 
+  // Selecting a player auto-suggests their team (previous team, else age-based).
+  const handlePlayerSelect = (index, playerId) => {
+    const player = players.find((p) => p.id === Number(playerId));
+    const season = date ? getSeasonStartYear(date) : getCurrentSeasonStartYear();
+    const activePlayers = players.filter((p) => !isPlayerHidden(visibility, p.id, season));
+    const suggested = suggestTeamForPlayer(player, activePlayers);
+    const updated = [...goalscorers];
+    updated[index] = {
+      ...updated[index],
+      player_id: playerId,
+      team: suggested || updated[index].team,
+    };
+    setGoalscorers(updated);
+  };
+
   const calculateScores = () => {
     let teamYoungScore = 0;
     let teamOldScore = 0;
 
     goalscorers.forEach(scorer => {
-      if (scorer.player_id && (scorer.goals > 0 || scorer.own_goals > 0)) {
+      if (scorer.player_id && scorer.team && (scorer.goals > 0 || scorer.own_goals > 0)) {
         if (scorer.team === 'young') {
           teamYoungScore += scorer.goals;
           teamOldScore += scorer.own_goals; // Own goals count for the other team
@@ -85,6 +115,15 @@ const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
       return;
     }
 
+    // Every scorer with goals must have a team assigned.
+    const missingTeam = goalscorers.some(
+      (s) => s.player_id && (s.goals > 0 || s.own_goals > 0) && !s.team
+    );
+    if (missingTeam) {
+      setError('Please select a team for each goalscorer');
+      return;
+    }
+
     setLoading(true);
     setError('');
     setSuccess('');
@@ -93,7 +132,7 @@ const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
 
     // Convert goalscorers to the format expected by the API
     const goals = goalscorers
-      .filter(scorer => scorer.player_id && (scorer.goals > 0 || scorer.own_goals > 0))
+      .filter(scorer => scorer.player_id && scorer.team && (scorer.goals > 0 || scorer.own_goals > 0))
       .flatMap(scorer => {
         const goals = [];
         // Add regular goals
@@ -141,6 +180,21 @@ const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
   };
 
   const { teamYoungScore, teamOldScore } = calculateScores();
+
+  // Only active players for the match's season are selectable. The season comes
+  // from the entered date (falling back to the current season while empty).
+  // Already-selected players are always kept in the list so a selection can't
+  // silently disappear if the date changes into a season where they're hidden.
+  const season = date ? getSeasonStartYear(date) : getCurrentSeasonStartYear();
+  const activeIds = new Set(
+    players.filter((p) => !isPlayerHidden(visibility, p.id, season)).map((p) => p.id)
+  );
+  const selectedIds = new Set(
+    goalscorers.map((s) => Number(s.player_id)).filter(Boolean)
+  );
+  const optionPlayers = players.filter(
+    (p) => activeIds.has(p.id) || selectedIds.has(p.id)
+  );
 
   if (!isAdminAuthenticated) {
     return null;
@@ -191,12 +245,12 @@ const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
                   select
                   label="Player"
                   value={scorer.player_id}
-                  onChange={(e) => updateGoalscorer(index, 'player_id', e.target.value)}
+                  onChange={(e) => handlePlayerSelect(index, e.target.value)}
                   disabled={loading}
                 >
-                  {players.map((player) => (
+                  {optionPlayers.map((player) => (
                     <MenuItem key={player.id} value={player.id}>
-                      {player.name}
+                      {player.name}{!activeIds.has(player.id) ? ' (hidden)' : ''}
                     </MenuItem>
                   ))}
                 </TextField>
@@ -210,6 +264,7 @@ const MatchForm = ({ globalPassword, isAdminAuthenticated }) => {
                   onChange={(e) => updateGoalscorer(index, 'team', e.target.value)}
                   disabled={loading}
                 >
+                  <MenuItem value=""><em>Select team</em></MenuItem>
                   <MenuItem value="old">Team Old</MenuItem>
                   <MenuItem value="young">Team Young</MenuItem>
                 </TextField>

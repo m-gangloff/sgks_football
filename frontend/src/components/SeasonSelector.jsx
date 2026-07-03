@@ -7,9 +7,9 @@ import { ALL_SEASONS, getSeasonLabel } from '../utils/season';
 // `seasons` is a list of season start years (newest first). The currently
 // selected season is always shown as an option even if it has no data yet, so
 // the selection never silently disappears.
-const SeasonSelector = ({ value, onChange, seasons }) => {
+const SeasonSelector = ({ value, onChange, seasons, allowAllTime = true }) => {
   const options = [...seasons];
-  if (value !== ALL_SEASONS && !options.includes(value)) {
+  if (value !== ALL_SEASONS && value != null && !options.includes(value)) {
     options.push(value);
     options.sort((a, b) => b - a);
   }
@@ -23,7 +23,7 @@ const SeasonSelector = ({ value, onChange, seasons }) => {
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
-        <MenuItem value={ALL_SEASONS}>{getSeasonLabel(ALL_SEASONS)}</MenuItem>
+        {allowAllTime && <MenuItem value={ALL_SEASONS}>{getSeasonLabel(ALL_SEASONS)}</MenuItem>}
         {options.map((startYear) => (
           <MenuItem key={startYear} value={startYear}>
             {getSeasonLabel(startYear)}

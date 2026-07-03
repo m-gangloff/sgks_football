@@ -53,6 +53,56 @@ export function isDateInSeason(dateInput, seasonStartYear) {
   return getSeasonStartYear(dateInput) === seasonStartYear;
 }
 
+// The "ongoing" (not-yet-finished) season: the later of the season today falls
+// into and the newest season that already has a game. Everything before it is
+// considered over.
+export function getOngoingSeason(seasonsPresent = []) {
+  const byDate = getCurrentSeasonStartYear();
+  const withGames = seasonsPresent.filter((s) => typeof s === 'number');
+  const maxWithGames = withGames.length ? Math.max(...withGames) : -Infinity;
+  return Math.max(byDate, maxWithGames);
+}
+
+// Decide which seasons a viewer may see. Non-admins only get seasons that are
+// over (results stay a surprise during the ongoing season); admins get all.
+// `seasonsPresent` should be the season start years found in the data (desc).
+// Returns the selectable options, whether "All time" is allowed, the season to
+// actually filter by (clamped for non-admins), and whether nothing is viewable.
+export function resolveSeasonAccess({ isAdmin, selectedSeason, seasonsPresent = [] }) {
+  const ongoingSeason = getOngoingSeason(seasonsPresent);
+
+  if (isAdmin) {
+    return {
+      ongoingSeason,
+      options: seasonsPresent,
+      allowAllTime: true,
+      effectiveSeason: selectedSeason,
+      noAccess: false,
+    };
+  }
+
+  const overSeasons = seasonsPresent.filter((s) => typeof s === 'number' && s < ongoingSeason);
+  let effectiveSeason;
+  if (
+    selectedSeason !== ALL_SEASONS &&
+    typeof selectedSeason === 'number' &&
+    overSeasons.includes(selectedSeason)
+  ) {
+    effectiveSeason = selectedSeason;
+  } else {
+    // overSeasons is sorted newest-first, so [0] is the latest finished season.
+    effectiveSeason = overSeasons.length ? overSeasons[0] : null;
+  }
+
+  return {
+    ongoingSeason,
+    options: overSeasons,
+    allowAllTime: false,
+    effectiveSeason,
+    noAccess: effectiveSeason == null,
+  };
+}
+
 // Effective "hidden" state of a player for a season, given the sparse list of
 // visibility overrides ([{ player_id, season_start_year, hidden }]).
 //

@@ -215,6 +215,7 @@ function App() {
         {currentPage === 'stats' && (
           <StatsPage
             globalPassword={globalPassword}
+            isAdminAuthenticated={isAdminAuthenticated}
             selectedSeason={selectedSeason}
             onSeasonChange={handleSeasonChange}
           />

@@ -14,7 +14,7 @@ import PlayerModal from './PlayerModal';
 import UnknownPlayerManager from './UnknownPlayerManager';
 import SeasonSelector from './SeasonSelector';
 import PlayerVisibilityManager from './PlayerVisibilityManager';
-import { seasonsFromDates, isDateInSeason, isPlayerHidden, ALL_SEASONS } from '../utils/season';
+import { seasonsFromDates, isDateInSeason, isPlayerHidden, ALL_SEASONS, resolveSeasonAccess } from '../utils/season';
 
 const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selectedSeason, onSeasonChange }) => {
   const [players, setPlayers] = useState([]);
@@ -68,13 +68,20 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
     players.flatMap((p) => p.goals.map((g) => g.match?.date))
   );
 
-  // Each player with their goals restricted to the selected season, sorted by
+  // Non-admins only see finished seasons; admins see everything.
+  const { options: seasonOptions, allowAllTime, effectiveSeason, noAccess } = resolveSeasonAccess({
+    isAdmin: isAdminAuthenticated,
+    selectedSeason,
+    seasonsPresent: availableSeasons,
+  });
+
+  // Each player with their goals restricted to the effective season, sorted by
   // non-own goals scored that season (descending). The selection is shared, so
   // the per-player modal receives the same season-filtered goals.
   const seasonPlayers = players
     .map((player) => ({
       ...player,
-      goals: player.goals.filter((g) => isDateInSeason(g.match?.date, selectedSeason)),
+      goals: player.goals.filter((g) => isDateInSeason(g.match?.date, effectiveSeason)),
     }))
     .sort((a, b) => {
       const aGoals = a.goals.filter((g) => !g.is_own_goal).length;
@@ -82,12 +89,12 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
       return bGoals - aGoals;
     });
 
-  // Roster shown in the UI hides players marked hidden for the selected season.
+  // Roster shown in the UI hides players marked hidden for the effective season.
   const visiblePlayers = seasonPlayers.filter(
-    (p) => !isPlayerHidden(visibility, p.id, selectedSeason)
+    (p) => !isPlayerHidden(visibility, p.id, effectiveSeason)
   );
   const hiddenCount = seasonPlayers.length - visiblePlayers.length;
-  const canManageVisibility = isAdminAuthenticated && selectedSeason !== ALL_SEASONS;
+  const canManageVisibility = isAdminAuthenticated && effectiveSeason !== ALL_SEASONS && effectiveSeason != null;
 
   const handlePlayerClick = (player) => {
     setSelectedPlayer(player);
@@ -188,18 +195,21 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
         }}
       >
         <Typography variant="h5" gutterBottom sx={{ mb: 0 }}>
-          Players ({visiblePlayers.length})
+          Players{noAccess ? '' : ` (${visiblePlayers.length})`}
           {isAdminAuthenticated && hiddenCount > 0 && (
             <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
               ({hiddenCount} hidden)
             </Typography>
           )}
         </Typography>
-        <SeasonSelector
-          value={selectedSeason}
-          onChange={onSeasonChange}
-          seasons={availableSeasons}
-        />
+        {!noAccess && (
+          <SeasonSelector
+            value={effectiveSeason}
+            onChange={onSeasonChange}
+            seasons={seasonOptions}
+            allowAllTime={allowAllTime}
+          />
+        )}
       </Box>
 
       {isAdminAuthenticated && (
@@ -247,7 +257,11 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
         </Box>
       )}
 
-      {visiblePlayers.length === 0 ? (
+      {noAccess ? (
+        <Alert severity="info">
+          Season results are hidden until the season is over — check back once the current season has finished.
+        </Alert>
+      ) : visiblePlayers.length === 0 ? (
         <Typography variant="body1" color="text.secondary">
           {players.length === 0
             ? `No players found. ${isAdminAuthenticated ? 'Add some players to get started!' : 'Contact an admin to add players.'}`
@@ -346,7 +360,7 @@ const PlayerList = ({ globalPassword, adminPassword, isAdminAuthenticated, selec
           onClose={() => setShowVisibilityManager(false)}
           players={players}
           overrides={visibility}
-          selectedSeason={selectedSeason}
+          selectedSeason={effectiveSeason}
           adminPassword={adminPassword}
           onChanged={fetchVisibility}
         />

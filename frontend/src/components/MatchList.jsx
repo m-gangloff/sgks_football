@@ -16,7 +16,7 @@ import {
 import { getMatches, deleteAllMatches } from '../api';
 import MatchModal from './MatchModal';
 import SeasonSelector from './SeasonSelector';
-import { seasonsFromDates, isDateInSeason } from '../utils/season';
+import { seasonsFromDates, isDateInSeason, resolveSeasonAccess } from '../utils/season';
 
 // Compact metric tile used in the matches summary.
 const StatTile = ({ label, value, color }) => (
@@ -67,9 +67,15 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, select
     fetchMatches();
   }, [globalPassword]);
 
-  // Seasons available in the data, and the matches for the selected season.
+  // Seasons available in the data, gated by viewer role (non-admins only see
+  // finished seasons), then the matches for the effective season.
   const availableSeasons = seasonsFromDates(matches.map((m) => m.date));
-  const filteredMatches = matches.filter((m) => isDateInSeason(m.date, selectedSeason));
+  const { options: seasonOptions, allowAllTime, effectiveSeason, noAccess } = resolveSeasonAccess({
+    isAdmin: isAdminAuthenticated,
+    selectedSeason,
+    seasonsPresent: availableSeasons,
+  });
+  const filteredMatches = noAccess ? [] : matches.filter((m) => isDateInSeason(m.date, effectiveSeason));
 
   // Season-aware summary across the filtered matches.
   const summary = filteredMatches.reduce(
@@ -148,13 +154,16 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, select
         }}
       >
         <Typography variant="h5" gutterBottom sx={{ mb: 0 }}>
-          Matches ({filteredMatches.length})
+          Matches{noAccess ? '' : ` (${filteredMatches.length})`}
         </Typography>
-        <SeasonSelector
-          value={selectedSeason}
-          onChange={onSeasonChange}
-          seasons={availableSeasons}
-        />
+        {!noAccess && (
+          <SeasonSelector
+            value={effectiveSeason}
+            onChange={onSeasonChange}
+            seasons={seasonOptions}
+            allowAllTime={allowAllTime}
+          />
+        )}
       </Box>
 
       {isAdminAuthenticated && (
@@ -168,7 +177,11 @@ const MatchList = ({ globalPassword, adminPassword, isAdminAuthenticated, select
         </Button>
       )}
 
-      {filteredMatches.length === 0 ? (
+      {noAccess ? (
+        <Alert severity="info">
+          Match results are hidden until the season is over — check back once the current season has finished.
+        </Alert>
+      ) : filteredMatches.length === 0 ? (
         <Typography variant="body1" color="text.secondary">
           {matches.length === 0
             ? `No matches found. ${isAdminAuthenticated ? 'Add some matches to get started!' : 'Contact an admin to add matches.'}`

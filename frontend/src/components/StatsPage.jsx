@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import SlideshowIcon from '@mui/icons-material/Slideshow';
 import { getPlayers, getMatches } from '../api';
-import { getSeasonLabel } from '../utils/season';
+import { getSeasonLabel, resolveSeasonAccess, seasonsFromDates } from '../utils/season';
 import { computeSeasonStats } from '../utils/stats';
 import SeasonSelector from './SeasonSelector';
 import Podium from './stats/Podium';
@@ -17,7 +17,6 @@ import LeaderboardChart from './stats/LeaderboardChart';
 import GoalRaceChart from './stats/GoalRaceChart';
 import AgeGoalsScatter from './stats/AgeGoalsScatter';
 import PresentationMode from './PresentationMode';
-import { seasonsFromDates } from '../utils/season';
 
 const StatTile = ({ label, value, color }) => (
   <Paper variant="outlined" sx={{ p: 1.5, flex: '1 1 120px', minWidth: 100, textAlign: 'center' }}>
@@ -36,7 +35,7 @@ const Section = ({ title, children, action }) => (
   </Paper>
 );
 
-const StatsPage = ({ globalPassword, selectedSeason, onSeasonChange }) => {
+const StatsPage = ({ globalPassword, isAdminAuthenticated, selectedSeason, onSeasonChange }) => {
   const [players, setPlayers] = useState([]);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,8 +67,13 @@ const StatsPage = ({ globalPassword, selectedSeason, onSeasonChange }) => {
   }, [globalPassword]);
 
   const availableSeasons = seasonsFromDates(matches.map((m) => m.date));
-  const stats = computeSeasonStats(players, matches, selectedSeason);
-  const seasonLabel = getSeasonLabel(selectedSeason);
+  const { options: seasonOptions, allowAllTime, effectiveSeason, noAccess } = resolveSeasonAccess({
+    isAdmin: isAdminAuthenticated,
+    selectedSeason,
+    seasonsPresent: availableSeasons,
+  });
+  const stats = computeSeasonStats(players, matches, effectiveSeason);
+  const seasonLabel = getSeasonLabel(effectiveSeason);
 
   if (loading) {
     return (
@@ -97,21 +101,32 @@ const StatsPage = ({ globalPassword, selectedSeason, onSeasonChange }) => {
           mb: 3,
         }}
       >
-        <Typography variant="h5">Season Stats — {seasonLabel}</Typography>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <SeasonSelector value={selectedSeason} onChange={onSeasonChange} seasons={availableSeasons} />
-          <Button
-            variant="contained"
-            startIcon={<SlideshowIcon />}
-            onClick={() => setPresenting(true)}
-            disabled={!hasData}
-          >
-            Present
-          </Button>
-        </Box>
+        <Typography variant="h5">Season Stats{noAccess ? '' : ` — ${seasonLabel}`}</Typography>
+        {!noAccess && (
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <SeasonSelector
+              value={effectiveSeason}
+              onChange={onSeasonChange}
+              seasons={seasonOptions}
+              allowAllTime={allowAllTime}
+            />
+            <Button
+              variant="contained"
+              startIcon={<SlideshowIcon />}
+              onClick={() => setPresenting(true)}
+              disabled={!hasData}
+            >
+              Present
+            </Button>
+          </Box>
+        )}
       </Box>
 
-      {!hasData ? (
+      {noAccess ? (
+        <Alert severity="info">
+          Season stats are hidden until the season is over — check back once the current season has finished.
+        </Alert>
+      ) : !hasData ? (
         <Alert severity="info">No matches recorded for {seasonLabel}. Pick another season.</Alert>
       ) : (
         <>
@@ -159,7 +174,7 @@ const StatsPage = ({ globalPassword, selectedSeason, onSeasonChange }) => {
         </>
       )}
 
-      {presenting && (
+      {presenting && !noAccess && (
         <PresentationMode
           open={presenting}
           onClose={() => setPresenting(false)}

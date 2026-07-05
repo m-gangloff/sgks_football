@@ -253,10 +253,11 @@ def create_backup(admin_auth: bool = Depends(get_admin_auth)):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_filename = f"football_backup_{timestamp}.db"
         backup_path = os.path.join(backup_dir, backup_filename)
-        
-        # Copy the database file
-        shutil.copy2("football.db", backup_path)
-        
+
+        # Export the live database (Postgres in production) into a portable
+        # SQLite snapshot that can be downloaded and re-imported.
+        crud.export_database_to_sqlite(backup_path)
+
         # Return the file as a downloadable response
         return FileResponse(
             path=backup_path,

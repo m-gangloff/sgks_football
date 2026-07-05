@@ -135,20 +135,44 @@ The frontend will be available at `http://localhost:5173`
 
 ## Database
 
-The application uses SQLite for data storage. The database file is located at `backend/football.db`.
+The database connection is configured with the `FOOTBALL_DB_URL` environment variable (read in `backend/app/database.py`).
+
+- **Local development** defaults to SQLite at `backend/football.db` (no config needed).
+- **Production** should use a managed Postgres so data persists (hosts with an ephemeral filesystem, like Render's free tier, lose local SQLite writes on restart). Set:
+
+  ```
+  FOOTBALL_DB_URL=postgresql+psycopg://USER:PASSWORD@HOST/DBNAME?sslmode=require
+  ```
+
+  A free [Neon](https://neon.tech) Postgres works well (persists, no expiry, scales to zero between uses). The schema is created automatically on startup.
+
+### Migrating existing SQLite data to Postgres
+
+One-time copy of your current `football.db` into the new database (run from `backend/`):
+
+```bash
+TARGET_DB_URL="postgresql+psycopg://USER:PASSWORD@HOST/DBNAME?sslmode=require" \
+  uv run python migrate_db.py
+```
+
+It copies every table (preserving ids) and fixes the Postgres id sequences. It refuses to run if the target already has data; pass `--force` to clear and re-import.
 
 ### Backup and Restore
 
 **Creating Backups**:
 - Use the web interface (admin access required)
-- Backups are automatically downloaded to your device
-- Backup files are stored in `backend/backups/`
+- The backup is a portable SQLite snapshot of the live database, generated on demand and downloaded to your device (works regardless of the live backend)
 
 **Restoring Backups**:
-1. Stop the web application
-2. Rename the backup file to `football.db`
-3. Replace the existing `football.db` file in the backend directory
-4. Restart the web application
+Re-import the downloaded snapshot into the live database with the migration script (from `backend/`):
+
+```bash
+SOURCE_DB_URL="sqlite:///path/to/football_backup_YYYYMMDD_HHMMSS.db" \
+TARGET_DB_URL="$FOOTBALL_DB_URL" \
+  uv run python migrate_db.py --force
+```
+
+`--force` clears the target and re-imports from the snapshot. (For a local SQLite setup, you can instead just replace `backend/football.db` with the backup file and restart.)
 
 ## Testing
 

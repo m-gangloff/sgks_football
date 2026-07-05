@@ -100,6 +100,33 @@ def delete_match(db: Session, match_id: int):
         "deleted_goals": goals_deleted
     }
 
+def export_database_to_sqlite(dest_path: str):
+    """Write the current database's contents into a portable SQLite file.
+
+    Used for downloadable backups. Works regardless of the live backend (e.g.
+    Postgres in production) — it reads via the app's engine and writes a fresh
+    SQLite file with the same schema, which can be re-imported with migrate_db.py.
+    """
+    from sqlalchemy import create_engine, select, insert
+    from .database import engine as src_engine
+
+    tables = [
+        models.Player.__table__,
+        models.Match.__table__,
+        models.Goal.__table__,
+        models.PlayerVisibility.__table__,
+    ]
+    dst_engine = create_engine(f"sqlite:///{dest_path}")
+    try:
+        models.Base.metadata.create_all(bind=dst_engine)
+        with src_engine.connect() as sconn, dst_engine.begin() as dconn:
+            for table in tables:
+                rows = [dict(r) for r in sconn.execute(select(table)).mappings().all()]
+                if rows:
+                    dconn.execute(insert(table), rows)
+    finally:
+        dst_engine.dispose()
+
 def get_player_visibility(db: Session):
     """Return all per-season visibility overrides."""
     return db.query(models.PlayerVisibility).all()

@@ -46,9 +46,11 @@ const BackupManager = ({ globalPassword, adminPassword, isAdminAuthenticated }) 
       const response = await createBackup(adminPassword);
       
       if (response.ok) {
-        // Get the filename from the response headers
+        // Get the filename from the response headers, falling back to a
+        // timestamped name if the header isn't readable (e.g. not exposed).
         const contentDisposition = response.headers.get('content-disposition');
-        let filename = 'football_backup.db';
+        const ts = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+        let filename = `football_backup_${ts}.db`;
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename="(.+)"/);
           if (filenameMatch) {
@@ -155,22 +157,17 @@ const BackupManager = ({ globalPassword, adminPassword, isAdminAuthenticated }) 
 
       <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
         <Typography variant="h6" gutterBottom>
-          How to Restore a Backup
+          About Backups
         </Typography>
         <Typography variant="body2" paragraph>
-          1. Download a backup file from the list above (if you have admin access)
+          Each backup is a portable SQLite snapshot of the database at the moment
+          you click <strong>Create New Backup</strong>, downloaded straight to your device.
         </Typography>
         <Typography variant="body2" paragraph>
-          2. Stop the web application
-        </Typography>
-        <Typography variant="body2" paragraph>
-          3. Rename the backup file to <code>football.db</code>
-        </Typography>
-        <Typography variant="body2" paragraph>
-          4. Replace the existing <code>football.db</code> file in the backend directory
-        </Typography>
-        <Typography variant="body2">
-          5. Restart the web application
+          To restore, an admin re-imports a snapshot into the live database using the
+          <code> migrate_db.py</code> script with the backup file as the source (see the
+          project README, “Restoring Backups”). Keep a snapshot after each match so you
+          always have a recent copy.
         </Typography>
       </Box>
     </Box>

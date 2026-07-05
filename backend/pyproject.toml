@@ -8,6 +8,7 @@ dependencies = [
     "httpx",
     "uvicorn",
     "sqlalchemy",
+    "psycopg[binary]",
     "pydantic",
     "python-dotenv",
     "google-api-python-client",
